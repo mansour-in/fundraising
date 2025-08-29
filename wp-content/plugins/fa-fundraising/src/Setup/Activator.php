@@ -120,9 +120,28 @@ class Activator {
             KEY idx_status (status)
         ) $charset;";
 
+        $auth = $wpdb->prefix . 'fa_auth_tokens';
+        $sql4 = "CREATE TABLE {$auth} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            email VARCHAR(191) NOT NULL,
+            user_id BIGINT UNSIGNED NULL,
+            type VARCHAR(10) NOT NULL, /* magic|otp */
+            secret VARCHAR(255) NOT NULL, /* hashed token or OTP */
+            expires_at DATETIME NOT NULL,
+            used TINYINT(1) NOT NULL DEFAULT 0,
+            meta LONGTEXT NULL,
+            PRIMARY KEY  (id),
+            KEY idx_email (email),
+            KEY idx_user (user_id),
+            KEY idx_type (type),
+            KEY idx_used_exp (used, expires_at)
+        ) $charset;";
+
         dbDelta($sql1);
         dbDelta($sql2);
         dbDelta($sql3);
+        dbDelta($sql4);
     }
 
     private static function add_roles_caps(): void
