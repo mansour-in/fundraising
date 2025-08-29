@@ -1,0 +1,12 @@
+{
+  "name": "futureachievers/fa-fundraising",
+  "type": "wordpress-plugin",
+  "require": {
+    "php": ">=8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "FA\\Fundraising\\": "src/"
+    }
+  }
+}
