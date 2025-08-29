@@ -138,10 +138,25 @@ class Activator {
             KEY idx_used_exp (used, expires_at)
         ) $charset;";
 
+        $events = $wpdb->prefix . 'fa_events';
+        $sql5 = "CREATE TABLE {$events} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            event_id VARCHAR(191) NOT NULL,
+            handler VARCHAR(64) NOT NULL,
+            processed_at DATETIME NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'ok',
+            raw LONGTEXT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_event (event_id),
+            KEY idx_handler (handler)
+        ) $charset;";
+
         dbDelta($sql1);
         dbDelta($sql2);
         dbDelta($sql3);
         dbDelta($sql4);
+        dbDelta($sql5);
     }
 
     private static function add_roles_caps(): void

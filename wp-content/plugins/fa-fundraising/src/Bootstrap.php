@@ -18,6 +18,9 @@ class Bootstrap {
 
         (new \FA\Fundraising\Api\StatsController())->init();
         (new \FA\Fundraising\Api\DonationController())->init();
+        (new \FA\Fundraising\Api\CheckoutController())->init();
+        (new \FA\Fundraising\Admin\Settings())->init();
+        (new \FA\Fundraising\Payments\WebhookController())->init();
 
         (new \FA\Fundraising\Widgets\Elementor\Plugin())->init();
 
