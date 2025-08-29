@@ -116,12 +116,68 @@ class DonorShortcodes {
                 esc_html__('Login','fa-fundraising')
             );
         }
+        $nonce = wp_create_nonce('wp_rest');
+
         ob_start(); ?>
         <div class="fa-card">
             <h3><?php esc_html_e('My Dashboard','fa-fundraising'); ?></h3>
-            <p><?php esc_html_e('KPI cards, charts, and tables will appear here in later steps.','fa-fundraising'); ?></p>
+
+            <div id="fa-kpis" style="display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:12px;">
+                <div class="fa-kpi"><strong><?php esc_html_e('Lifetime Total','fa-fundraising'); ?>:</strong> <span id="k_lifetime">—</span></div>
+                <div class="fa-kpi"><strong><?php esc_html_e('Month to Date','fa-fundraising'); ?>:</strong> <span id="k_mtd">—</span></div>
+                <div class="fa-kpi"><strong><?php esc_html_e('Last Month','fa-fundraising'); ?>:</strong> <span id="k_lm">—</span></div>
+                <div class="fa-kpi"><strong><?php esc_html_e('Active Sponsorships','fa-fundraising'); ?>:</strong> <span id="k_active">—</span></div>
+            </div>
+
+            <h4 style="margin-top:1rem;"><?php esc_html_e('Breakdown','fa-fundraising'); ?></h4>
+            <ul id="fa-breakdown" style="margin:.2rem 0 1rem 1rem;">
+                <li><?php esc_html_e('General','fa-fundraising'); ?>: <span id="b_gen">—</span></li>
+                <li><?php esc_html_e('Cause','fa-fundraising'); ?>: <span id="b_cause">—</span></li>
+                <li><?php esc_html_e('Sponsorship','fa-fundraising'); ?>: <span id="b_spon">—</span></li>
+            </ul>
+
+            <div id="fa-series" style="margin-top:1rem;">
+                <h4><?php esc_html_e('Donations (last 12 months)','fa-fundraising'); ?></h4>
+                <div id="fa-series-labels" style="font-size:.9rem;opacity:.8;"></div>
+                <div id="fa-series-data" style="font-family:monospace;"></div>
+            </div>
         </div>
-        <?php return ob_get_clean();
+
+        <script>
+        (function(){
+            const api = (p)=> (window.wpApiSettings?.root || '/wp-json/') + 'faf/v1' + p;
+            const money = (v)=> new Intl.NumberFormat(undefined,{style:'currency',currency:'INR',maximumFractionDigits:0}).format(v||0);
+
+            async function loadSummary(){
+                const r = await fetch(api('/stats/summary'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
+                const j = await r.json();
+                if (!j.ok) return;
+                document.getElementById('k_lifetime').textContent = money(j.lifetime_total);
+                document.getElementById('k_mtd').textContent = money(j.month_to_date);
+                document.getElementById('k_lm').textContent = money(j.last_month);
+                document.getElementById('k_active').textContent = j.active_sponsorships;
+
+                const bd = j.breakdown || {};
+                const fmt = (o)=> (o && typeof o.amount !== 'undefined') ? money(o.amount) + ' ('+(o.count||0)+')' : '—';
+                document.getElementById('b_gen').textContent = fmt(bd.general);
+                document.getElementById('b_cause').textContent = fmt(bd.cause);
+                document.getElementById('b_spon').textContent = fmt(bd.sponsorship);
+            }
+
+            async function loadSeries(){
+                const r = await fetch(api('/stats/series'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
+                const j = await r.json();
+                if (!j.ok) return;
+                document.getElementById('fa-series-labels').textContent = j.labels.join('  |  ');
+                document.getElementById('fa-series-data').textContent = j.data.map(v=>money(v)).join('  |  ');
+            }
+
+            loadSummary();
+            loadSeries();
+        })();
+        </script>
+        <?php
+        return ob_get_clean();
     }
 
     public function receipts($atts = [], $content = ''): string
@@ -150,11 +206,85 @@ class DonorShortcodes {
                 esc_html__('Login','fa-fundraising')
             );
         }
+        $u = wp_get_current_user();
+        $nonce = wp_create_nonce('wp_rest');
+
+        $meta = [
+            'phone' => get_user_meta($u->ID,'fa_phone',true),
+            'pan'   => get_user_meta($u->ID,'fa_pan',true),
+            'address_line1'=> get_user_meta($u->ID,'fa_address_line1',true),
+            'address_line2'=> get_user_meta($u->ID,'fa_address_line2',true),
+            'city'=> get_user_meta($u->ID,'fa_city',true),
+            'state'=> get_user_meta($u->ID,'fa_state',true),
+            'pin'=> get_user_meta($u->ID,'fa_pin',true),
+            'country'=> get_user_meta($u->ID,'fa_country',true),
+        ];
+
         ob_start(); ?>
-        <div class="fa-card">
+        <div class="fa-card" style="max-width:640px;">
             <h3><?php esc_html_e('My Settings','fa-fundraising'); ?></h3>
-            <p><?php esc_html_e('Profile, PAN, address, privacy tools coming soon.','fa-fundraising'); ?></p>
+            <form id="fa-settings-form" style="display:grid;gap:.6rem;">
+                <label><?php esc_html_e('Name','fa-fundraising'); ?></label>
+                <input type="text" name="name" value="<?php echo esc_attr($u->display_name); ?>" style="padding:.6rem;">
+                <label><?php esc_html_e('Phone','fa-fundraising'); ?></label>
+                <input type="text" name="phone" value="<?php echo esc_attr($meta['phone']); ?>" style="padding:.6rem;">
+                <label><?php esc_html_e('PAN (for 80G)','fa-fundraising'); ?></label>
+                <input type="text" name="pan" value="<?php echo esc_attr($meta['pan']); ?>" style="padding:.6rem;">
+                <label><?php esc_html_e('Address Line 1','fa-fundraising'); ?></label>
+                <input type="text" name="address_line1" value="<?php echo esc_attr($meta['address_line1']); ?>" style="padding:.6rem;">
+                <label><?php esc_html_e('Address Line 2','fa-fundraising'); ?></label>
+                <input type="text" name="address_line2" value="<?php echo esc_attr($meta['address_line2']); ?>" style="padding:.6rem;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+                    <div>
+                        <label><?php esc_html_e('City','fa-fundraising'); ?></label>
+                        <input type="text" name="city" value="<?php echo esc_attr($meta['city']); ?>" style="padding:.6rem;">
+                    </div>
+                    <div>
+                        <label><?php esc_html_e('State','fa-fundraising'); ?></label>
+                        <input type="text" name="state" value="<?php echo esc_attr($meta['state']); ?>" style="padding:.6rem;">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+                    <div>
+                        <label><?php esc_html_e('PIN Code','fa-fundraising'); ?></label>
+                        <input type="text" name="pin" value="<?php echo esc_attr($meta['pin']); ?>" style="padding:.6rem;">
+                    </div>
+                    <div>
+                        <label><?php esc_html_e('Country','fa-fundraising'); ?></label>
+                        <input type="text" name="country" value="<?php echo esc_attr($meta['country']); ?>" style="padding:.6rem;">
+                    </div>
+                </div>
+                <button type="submit" style="padding:.7rem 1.2rem;"><?php esc_html_e('Save Settings','fa-fundraising'); ?></button>
+                <p id="fa-settings-msg" style="margin:.5rem 0 0;"></p>
+            </form>
         </div>
-        <?php return ob_get_clean();
+        <script>
+        (function(){
+            const form = document.getElementById('fa-settings-form');
+            const msg  = document.getElementById('fa-settings-msg');
+            const api  = (p)=> (window.wpApiSettings?.root || '/wp-json/') + 'faf/v1' + p;
+            form?.addEventListener('submit', async (e)=>{
+                e.preventDefault();
+                msg.textContent = '<?php echo esc_js(__('Saving...','fa-fundraising')); ?>';
+                const data = Object.fromEntries(new FormData(form).entries());
+                try{
+                    const r = await fetch(api('/me'), {
+                        method:'POST',
+                        headers:{
+                            'Content-Type':'application/json',
+                            'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    const j = await r.json();
+                    msg.textContent = j.ok ? '<?php echo esc_js(__('Saved.','fa-fundraising')); ?>' : (j.message || 'Error');
+                }catch(err){
+                    msg.textContent = 'Error';
+                }
+            });
+        })();
+        </script>
+        <?php
+        return ob_get_clean();
     }
 }
