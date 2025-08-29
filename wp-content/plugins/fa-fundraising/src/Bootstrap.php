@@ -27,6 +27,9 @@ class Bootstrap {
         (new \FA\Fundraising\CPT\Orphan())->init();
         (new \FA\Fundraising\CPT\Cause())->init();
 
+        (new \FA\Fundraising\Admin\Metaboxes\OrphanMetaBox())->init();
+        (new \FA\Fundraising\Admin\Metaboxes\CauseMetaBox())->init();
+
         (new \FA\Fundraising\Widgets\Elementor\Plugin())->init();
 
         // Minimal REST namespace (we’ll add routes later)
