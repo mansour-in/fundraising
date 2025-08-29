@@ -141,6 +141,21 @@ class DonorShortcodes {
                 <div id="fa-series-labels" style="font-size:.9rem;opacity:.8;"></div>
                 <div id="fa-series-data" style="font-family:monospace;"></div>
             </div>
+
+            <div id="fa-subs" style="margin-top:1rem;">
+                <h4><?php esc_html_e('My Subscriptions','fa-fundraising'); ?></h4>
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Subscription ID','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Status','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Current Period','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Manage','fa-fundraising'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="fa-subs-body"></tbody>
+                </table>
+            </div>
         </div>
 
         <script>
@@ -172,8 +187,32 @@ class DonorShortcodes {
                 document.getElementById('fa-series-data').textContent = j.data.map(v=>money(v)).join('  |  ');
             }
 
+            async function loadSubs(){
+                const r = await fetch(api('/subscriptions'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
+                const j = await r.json();
+                const body = document.getElementById('fa-subs-body');
+                body.innerHTML = '';
+                if (!j.ok || !j.items?.length){
+                    body.innerHTML = '<tr><td colspan="4" style="padding:10px;"><?php echo esc_js(__('No subscriptions found.','fa-fundraising')); ?></td></tr>';
+                    return;
+                }
+                j.items.forEach(s=>{
+                    const period = (s.current_start? new Date(s.current_start+'Z').toLocaleDateString():'—') + ' → ' + (s.current_end? new Date(s.current_end+'Z').toLocaleDateString():'—');
+                    const manage = s.manage_url ? `<a href="${s.manage_url}" target="_blank"><?php echo esc_js(__('Manage','fa-fundraising')); ?></a>` : '—';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                      <td style="padding:8px;border-bottom:1px solid #eee;">${s.razorpay_subscription_id}</td>
+                      <td style="padding:8px;border-bottom:1px solid #eee;">${s.status}</td>
+                      <td style="padding:8px;border-bottom:1px solid #eee;">${period}</td>
+                      <td style="padding:8px;border-bottom:1px solid #eee;">${manage}</td>
+                    `;
+                    body.appendChild(tr);
+                });
+            }
+
             loadSummary();
             loadSeries();
+            loadSubs();
         })();
         </script>
         <?php
@@ -189,12 +228,119 @@ class DonorShortcodes {
                 esc_html__('Login','fa-fundraising')
             );
         }
+        $nonce = wp_create_nonce('wp_rest');
+
         ob_start(); ?>
         <div class="fa-card">
-            <h3><?php esc_html_e('My Receipts','fa-fundraising'); ?></h3>
-            <p><?php esc_html_e('Receipt list and downloads will appear here.','fa-fundraising'); ?></p>
+            <h3><?php esc_html_e('My Donations & Receipts','fa-fundraising'); ?></h3>
+
+            <div style="display:flex;gap:.5rem;align-items:end;flex-wrap:wrap;margin:.5rem 0 1rem;">
+                <div>
+                    <label><?php esc_html_e('Type','fa-fundraising'); ?></label><br>
+                    <select id="fa-don-type"><option value=""><?php esc_html_e('All','fa-fundraising'); ?></option><option value="general">General</option><option value="cause">Cause</option><option value="sponsorship">Sponsorship</option></select>
+                </div>
+                <div>
+                    <label><?php esc_html_e('Status','fa-fundraising'); ?></label><br>
+                    <select id="fa-don-status"><option value=""><?php esc_html_e('All','fa-fundraising'); ?></option><option value="captured">Captured</option><option value="pending">Pending</option><option value="failed">Failed</option></select>
+                </div>
+                <div>
+                    <label><?php esc_html_e('From','fa-fundraising'); ?></label><br>
+                    <input type="date" id="fa-don-start">
+                </div>
+                <div>
+                    <label><?php esc_html_e('To','fa-fundraising'); ?></label><br>
+                    <input type="date" id="fa-don-end">
+                </div>
+                <button id="fa-don-apply" style="padding:.5rem 1rem;"><?php esc_html_e('Apply','fa-fundraising'); ?></button>
+            </div>
+
+            <div style="overflow:auto;">
+                <table class="fa-table" style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Date','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Type','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Amount','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Status','fa-fundraising'); ?></th>
+                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Receipt','fa-fundraising'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="fa-don-body"></tbody>
+                </table>
+            </div>
+
+            <div id="fa-don-page" style="margin-top:.6rem;"></div>
+            <p id="fa-don-msg" class="muted"></p>
         </div>
-        <?php return ob_get_clean();
+
+        <script>
+        (function(){
+            const api = (p)=> (window.wpApiSettings?.root || '/wp-json/') + 'faf/v1' + p;
+            const money = (v, cur='INR')=> new Intl.NumberFormat(undefined,{style:'currency',currency:cur,maximumFractionDigits:0}).format(v||0);
+
+            let page = 1, per_page = 10;
+
+            async function load(){
+                const type = document.getElementById('fa-don-type').value;
+                const status = document.getElementById('fa-don-status').value;
+                const start = document.getElementById('fa-don-start').value;
+                const end = document.getElementById('fa-don-end').value;
+                const q = new URLSearchParams({page, per_page});
+                if (type) q.append('type', type);
+                if (status) q.append('status', status);
+                if (start) q.append('start', start);
+                if (end) q.append('end', end);
+
+                const r = await fetch(api('/donations?'+q.toString()), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
+                const j = await r.json();
+                const body = document.getElementById('fa-don-body');
+                const pag  = document.getElementById('fa-don-page');
+                body.innerHTML='';
+
+                if (!j.ok || !j.items?.length){
+                    body.innerHTML = '<tr><td colspan="5" style="padding:10px;"><?php echo esc_js(__('No donations found.','fa-fundraising')); ?></td></tr>';
+                    pag.textContent='';
+                    return;
+                }
+
+                j.items.forEach(it=>{
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${new Date(it.created_at+'Z').toLocaleDateString()}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${it.type}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${money(it.amount, it.currency)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">${it.status}</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee;">
+                            ${it.status==='captured' ? `
+                              <a href="${api('/receipt/'+it.id+'?type=basic')}" target="_blank"><?php echo esc_js(__('Download Basic','fa-fundraising')); ?></a>
+                              &nbsp;|&nbsp;
+                              <a href="${api('/receipt/'+it.id+'?type=80g')}" target="_blank"><?php echo esc_js(__('Download 80G','fa-fundraising')); ?></a>
+                            ` : '<?php echo esc_js(__('—','fa-fundraising')); ?>'}
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+
+                // pagination
+                const totalPages = Math.ceil(j.total / j.per_page);
+                pag.innerHTML = '';
+                if (totalPages > 1){
+                    for (let i=1;i<=totalPages;i++){
+                        const btn = document.createElement('button');
+                        btn.textContent = i;
+                        btn.style = 'margin-right:6px;padding:.3rem .6rem;'+(i===page?'font-weight:bold;':'');
+                        btn.onclick = ()=>{ page=i; load(); };
+                        pag.appendChild(btn);
+                    }
+                }
+            }
+
+            document.getElementById('fa-don-apply').addEventListener('click', ()=>{ page=1; load(); });
+            load();
+        })();
+        </script>
+        <?php
+        return ob_get_clean();
     }
 
     public function settings($atts = [], $content = ''): string
