@@ -14,6 +14,8 @@ class Bootstrap {
         // Shortcodes (placeholders for now)
         (new \FA\Fundraising\Shortcodes\DonorShortcodes())->register();
 
+        (new \FA\Fundraising\Auth\Routes())->init();
+
         // Minimal REST namespace (we’ll add routes later)
         add_action('rest_api_init', function(){
             register_rest_route('faf/v1', '/ping', [
