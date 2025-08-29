@@ -17,6 +17,9 @@ class Bootstrap {
         (new \FA\Fundraising\Auth\Routes())->init();
 
         (new \FA\Fundraising\Api\StatsController())->init();
+        (new \FA\Fundraising\Api\DonationController())->init();
+
+        (new \FA\Fundraising\Widgets\Elementor\Plugin())->init();
 
         // Minimal REST namespace (we’ll add routes later)
         add_action('rest_api_init', function(){
