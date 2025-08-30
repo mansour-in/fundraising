@@ -24,6 +24,7 @@ class Bootstrap {
         (new \FA\Fundraising\Api\DirectoryController())->init();
         (new \FA\Fundraising\Api\SubscriptionController())->init();
         (new \FA\Fundraising\Admin\Settings())->init();
+        (new \FA\Fundraising\Admin\DonationsAdmin())->init();
         (new \FA\Fundraising\Payments\WebhookController())->init();
         (new \FA\Fundraising\CPT\Taxonomies())->init();
         (new \FA\Fundraising\CPT\Orphan())->init();
