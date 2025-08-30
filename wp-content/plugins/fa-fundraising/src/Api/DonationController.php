@@ -28,6 +28,11 @@ class DonationController {
                 'callback'=>[$this,'verify_receipt'],
                 'permission_callback'=>'__return_true'
             ]);
+            register_rest_route('faf/v1', '/public/recent-donations', [
+                'methods'=>'GET',
+                'callback'=>[$this,'recent_public'],
+                'permission_callback'=>'__return_true'
+            ]);
         });
     }
 
@@ -112,13 +117,98 @@ class DonationController {
 
     public function verify_receipt(\WP_REST_Request $req) {
         global $wpdb;
-        $pid = sanitize_text_field($req->get_param('payment_id'));
-        if (!$pid) return new \WP_Error('bad','payment_id required',['status'=>400]);
         $don = $wpdb->prefix.'fa_donations';
-        $row = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, donor_name, donor_email, amount, currency, status, created_at FROM $don WHERE razorpay_payment_id=%s", $pid
-        ), ARRAY_A);
+
+        $pid = sanitize_text_field($req->get_param('payment_id') ?: '');
+        $rno = sanitize_text_field($req->get_param('receipt_no') ?: '');
+
+        if (!$pid && !$rno) {
+            return new \WP_Error('bad','Provide payment_id or receipt_no',['status'=>400]);
+        }
+
+        if ($pid) {
+            $row = $wpdb->get_row($wpdb->prepare(
+                "SELECT id, donor_name, donor_email, amount, currency, status, created_at, receipt_no, type, cause_id, orphan_id \
+             FROM $don WHERE razorpay_payment_id=%s", $pid
+            ), ARRAY_A);
+        } else {
+            $row = $wpdb->get_row($wpdb->prepare(
+                "SELECT id, donor_name, donor_email, amount, currency, status, created_at, receipt_no, type, cause_id, orphan_id \
+             FROM $don WHERE receipt_no=%s", $rno
+            ), ARRAY_A);
+        }
+
         if (!$row) return new \WP_Error('not_found','Not found',['status'=>404]);
-        return ['ok'=>true,'receipt'=>$row];
+
+        // Mask donor identity for public verification
+        $display = trim((string)$row['donor_name']);
+        if (!$display) {
+            $em = (string)$row['donor_email'];
+            if ($em && strpos($em,'@') !== false) {
+                [$u,$d] = explode('@',$em,2);
+                $u = substr($u,0,2).'***';
+                $d = substr($d,0,1).'***';
+                $display = $u.'@'.$d;
+            } else {
+                $display = __('Donor','fa-fundraising');
+            }
+        }
+
+        return [
+            'ok'=>true,
+            'receipt'=>[
+                'receipt_no'=>$row['receipt_no'],
+                'payment_status'=>$row['status'],
+                'amount'=>(float)$row['amount'],
+                'currency'=>$row['currency'],
+                'date'=>$row['created_at'],
+                'type'=>$row['type'],
+                'cause_id'=> $row['cause_id'],
+                'orphan_id'=> $row['orphan_id'],
+                'donor_display'=>$display
+            ]
+        ];
+    }
+
+    public function recent_public(\WP_REST_Request $req) {
+        global $wpdb;
+        $don = $wpdb->prefix.'fa_donations';
+
+        $limit = min(50, max(1, (int)($req->get_param('limit') ?: 10)));
+        $type  = sanitize_text_field($req->get_param('type') ?: ''); // general|cause|sponsorship|''
+        $cause = (int)($req->get_param('cause_id') ?: 0);
+        $orph  = (int)($req->get_param('orphan_id') ?: 0);
+
+        $where = "WHERE status='captured'";
+        if ($type)  $where .= $wpdb->prepare(" AND type=%s", $type);
+        if ($cause) $where .= $wpdb->prepare(" AND cause_id=%d", $cause);
+        if ($orph)  $where .= $wpdb->prepare(" AND orphan_id=%d", $orph);
+
+        $rows = $wpdb->get_results("SELECT created_at, donor_name, donor_email, amount, currency, type FROM $don $where ORDER BY id DESC LIMIT $limit", ARRAY_A);
+
+        $out = [];
+        foreach ($rows as $r) {
+            $display = trim((string)$r['donor_name']);
+            if (!$display) {
+                $em = (string)$r['donor_email'];
+                if ($em && strpos($em,'@') !== false) {
+                    [$u,$d] = explode('@',$em,2);
+                    $u = substr($u,0,2).'***';
+                    $d = substr($d,0,1).'***';
+                    $display = $u.'@'.$d;
+                } else {
+                    $display = __('Donor','fa-fundraising');
+                }
+            }
+            $out[] = [
+                'date'=>$r['created_at'],
+                'donor'=>$display,
+                'amount'=>(float)$r['amount'],
+                'currency'=>$r['currency'],
+                'type'=>$r['type']
+            ];
+        }
+
+        return ['ok'=>true, 'items'=>$out];
     }
 }

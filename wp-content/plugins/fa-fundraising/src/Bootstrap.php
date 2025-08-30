@@ -14,6 +14,7 @@ class Bootstrap {
         // Shortcodes
         (new \FA\Fundraising\Shortcodes\DonorShortcodes())->register();
         (new \FA\Fundraising\Shortcodes\FundraisingShortcodes())->register();
+        (new \FA\Fundraising\Shortcodes\VerifyShortcode())->register();
 
         (new \FA\Fundraising\Auth\Routes())->init();
 
