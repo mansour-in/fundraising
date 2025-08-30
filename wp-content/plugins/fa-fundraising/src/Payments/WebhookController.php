@@ -2,6 +2,8 @@
 namespace FA\Fundraising\Payments;
 
 use WP_Error;
+use FA\Fundraising\Service\DonationEffects;
+use FA\Fundraising\Service\EmailService;
 
 if (!defined('ABSPATH')) exit;
 
@@ -115,6 +117,20 @@ class WebhookController {
             'receipt_no' => $receipt_no,
             'meta' => maybe_serialize(['notes'=>$notes])
         ]);
+
+        $insert_id = (int)$wpdb->insert_id;
+
+        // Recalculate cause progress (if applicable)
+        if ($cause_id) DonationEffects::update_cause_progress((int)$cause_id);
+
+        // If this captured payment was tied to a subscription for an orphan, slots will update in on_subscription_* handlers.
+        // For safety, if notes included orphan_id (one-time sponsorship), do NOT mark slots as active.
+
+        // Load the row just inserted to pass to mail/PDF
+        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $don WHERE id=%d", $insert_id), ARRAY_A);
+        if ($row) {
+            EmailService::send_thankyou_with_receipt($row);
+        }
     }
 
     private function on_payment_failed(array $p): void {
@@ -156,28 +172,39 @@ class WebhookController {
         $status = sanitize_text_field($sub['status'] ?? 'active');
         $cur_start = !empty($sub['current_start']) ? gmdate('Y-m-d H:i:s', (int)$sub['current_start']) : null;
         $cur_end   = !empty($sub['current_end'])   ? gmdate('Y-m-d H:i:s', (int)$sub['current_end'])   : null;
+        $orphan_id = (int)($sub['notes']['orphan_id'] ?? 0);
+        $periodicity = 'monthly'; // Razorpay subs we create below are monthly by default
 
         $row = $wpdb->get_row($wpdb->prepare("SELECT id FROM $table WHERE razorpay_subscription_id=%s", $sid));
         $notes = is_array($sub['notes'] ?? null) ? $sub['notes'] : [];
         $user_id = !empty($notes['user_id']) ? (int)$notes['user_id'] : 0;
         $email = !empty($notes['donor_email']) ? sanitize_email($notes['donor_email']) : '';
-
         if ($row) {
             $wpdb->update($table, [
                 'status'=>$status,
                 'current_start'=>$cur_start,
-                'current_end'=>$cur_end
+                'current_end'=>$cur_end,
+                'orphan_id'=> ($orphan_id ?: null),
+                'periodicity'=> $periodicity,
+                'notes'=> maybe_serialize($notes)
             ], ['id'=>$row->id]);
         } else {
             $wpdb->insert($table, [
                 'razorpay_subscription_id'=>$sid,
                 'user_id'=>$user_id ?: null,
                 'donor_email'=>$email ?: null,
+                'orphan_id'=> ($orphan_id ?: null),
+                'periodicity'=> $periodicity,
                 'status'=>$status,
                 'current_start'=>$cur_start,
                 'current_end'=>$cur_end,
                 'notes'=> maybe_serialize($notes)
             ]);
+        }
+
+        // Update orphan slots if we have an orphan
+        if ($orphan_id) {
+            DonationEffects::update_orphan_slots((int)$orphan_id);
         }
     }
 
@@ -188,6 +215,11 @@ class WebhookController {
         $status = sanitize_text_field($sub['status'] ?? '');
         if (!$sid) return;
         $wpdb->update($table, ['status'=>$status], ['razorpay_subscription_id'=>$sid]);
+
+        $orphan_id = (int)($sub['notes']['orphan_id'] ?? 0);
+        if ($orphan_id) {
+            DonationEffects::update_orphan_slots($orphan_id);
+        }
     }
 
     /** Reserve event id; return false if already processed */

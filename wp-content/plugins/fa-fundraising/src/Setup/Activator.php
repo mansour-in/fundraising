@@ -18,6 +18,8 @@ class Activator {
 
     public static function deactivate(): void
     {
+        // Clear scheduled cron when plugin deactivates
+        wp_clear_scheduled_hook('fa_nightly_sync');
         flush_rewrite_rules();
     }
 
@@ -110,6 +112,8 @@ class Activator {
             user_id BIGINT UNSIGNED NULL,
             donor_email VARCHAR(191) NULL,
             plan_id VARCHAR(64) NULL,
+            orphan_id BIGINT UNSIGNED NULL,
+            periodicity VARCHAR(12) NOT NULL DEFAULT 'monthly',
             status VARCHAR(20) NOT NULL DEFAULT 'active',
             current_start DATETIME NULL,
             current_end DATETIME NULL,
@@ -117,7 +121,8 @@ class Activator {
             PRIMARY KEY  (id),
             UNIQUE KEY uniq_sub (razorpay_subscription_id),
             KEY idx_user (user_id),
-            KEY idx_status (status)
+            KEY idx_status (status),
+            KEY idx_orphan (orphan_id)
         ) $charset;";
 
         $auth = $wpdb->prefix . 'fa_auth_tokens';

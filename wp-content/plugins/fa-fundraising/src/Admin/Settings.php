@@ -24,6 +24,10 @@ class Settings {
             register_setting('fa_fundraising', 'fa_org_logo_url');
             register_setting('fa_fundraising', 'fa_org_pan');
             register_setting('fa_fundraising', 'fa_org_80g_reg');
+            register_setting('fa_fundraising', 'fa_email_from');
+            register_setting('fa_fundraising', 'fa_email_bcc');
+            register_setting('fa_fundraising', 'fa_email_thankyou_subject');
+            register_setting('fa_fundraising', 'fa_email_thankyou_body');
         });
     }
 
@@ -44,6 +48,18 @@ class Settings {
               <tr><th><label>Org Logo URL</label></th><td><input type="text" name="fa_org_logo_url" value="<?php echo esc_attr(get_option('fa_org_logo_url','')); ?>" class="regular-text"></td></tr>
               <tr><th><label>Org PAN</label></th><td><input type="text" name="fa_org_pan" value="<?php echo esc_attr(get_option('fa_org_pan','')); ?>" class="regular-text"></td></tr>
               <tr><th><label>80G Registration No.</label></th><td><input type="text" name="fa_org_80g_reg" value="<?php echo esc_attr(get_option('fa_org_80g_reg','')); ?>" class="regular-text"></td></tr>
+            </table>
+            <h2 class="title">Email Templates</h2>
+            <table class="form-table" role="presentation">
+              <tr><th><label>From</label></th><td><input type="text" name="fa_email_from" value="<?php echo esc_attr(get_option('fa_email_from','')); ?>" class="regular-text" placeholder="Future Achievers &lt;donations@example.org&gt;"></td></tr>
+              <tr><th><label>BCC</label></th><td><input type="text" name="fa_email_bcc" value="<?php echo esc_attr(get_option('fa_email_bcc','')); ?>" class="regular-text"></td></tr>
+              <tr><th><label>Thank-you Subject</label></th><td><input type="text" name="fa_email_thankyou_subject" value="<?php echo esc_attr(get_option('fa_email_thankyou_subject','')); ?>" class="large-text"></td></tr>
+              <tr><th><label>Thank-you Body</label></th>
+                <td>
+                  <textarea name="fa_email_thankyou_body" class="large-text" rows="6"><?php echo esc_textarea(get_option('fa_email_thankyou_body','')); ?></textarea>
+                  <p class="description">Placeholders: {{name}}, {{amount}}, {{date}}, {{receipt_type}}, {{org}}</p>
+                </td>
+              </tr>
             </table>
             <?php submit_button(); ?>
           </form>
