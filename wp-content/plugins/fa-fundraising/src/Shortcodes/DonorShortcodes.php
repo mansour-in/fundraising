@@ -118,82 +118,168 @@ class DonorShortcodes {
         }
         $nonce = wp_create_nonce('wp_rest');
 
+        // Chart.js (lightweight via CDN)
+        wp_enqueue_script('fa-chartjs', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', [], null, true);
+
         ob_start(); ?>
+        <style>
+          .fa-grid{display:grid;gap:14px}
+          @media (min-width:900px){ .fa-grid{grid-template-columns:2fr 1fr} }
+          .fa-card{border:1px solid #e5e7eb;border-radius:14px;background:#fff;padding:14px}
+          .fa-kpis{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px}
+          .fa-kpi{border:1px dashed #e5e7eb;border-radius:12px;padding:10px;background:#fafafa}
+          .fa-muted{opacity:.7}
+          .fa-table{width:100%;border-collapse:collapse}
+          .fa-table th,.fa-table td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+          .fa-actions{display:flex;gap:8px;flex-wrap:wrap}
+          .fa-btn{padding:.55rem .9rem;border-radius:10px;border:1px solid #111;background:#111;color:#fff;text-decoration:none;display:inline-block}
+          .fa-btn--ghost{background:#f8fafc;border-color:#e5e7eb;color:#111}
+          canvas{width:100%!important;height:280px!important}
+        </style>
+
         <div class="fa-card">
-            <h3><?php esc_html_e('My Dashboard','fa-fundraising'); ?></h3>
-
-            <div id="fa-kpis" style="display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:12px;">
-                <div class="fa-kpi"><strong><?php esc_html_e('Lifetime Total','fa-fundraising'); ?>:</strong> <span id="k_lifetime">—</span></div>
-                <div class="fa-kpi"><strong><?php esc_html_e('Month to Date','fa-fundraising'); ?>:</strong> <span id="k_mtd">—</span></div>
-                <div class="fa-kpi"><strong><?php esc_html_e('Last Month','fa-fundraising'); ?>:</strong> <span id="k_lm">—</span></div>
-                <div class="fa-kpi"><strong><?php esc_html_e('Active Sponsorships','fa-fundraising'); ?>:</strong> <span id="k_active">—</span></div>
+          <div class="fa-actions" style="justify-content:space-between;align-items:center;">
+            <h3 style="margin:0;"><?php esc_html_e('My Dashboard','fa-fundraising'); ?></h3>
+            <div class="fa-actions">
+              <a class="fa-btn--ghost fa-btn" href="<?php echo esc_url(get_permalink((int) get_option('fa_donor_receipts_page_id'))); ?>"><?php esc_html_e('My Receipts','fa-fundraising'); ?></a>
+              <button id="fa-export" class="fa-btn--ghost fa-btn" type="button"><?php esc_html_e('Export CSV','fa-fundraising'); ?></button>
+              <button id="fa-logout" class="fa-btn--ghost fa-btn" type="button"><?php esc_html_e('Logout','fa-fundraising'); ?></button>
             </div>
+          </div>
 
-            <h4 style="margin-top:1rem;"><?php esc_html_e('Breakdown','fa-fundraising'); ?></h4>
-            <ul id="fa-breakdown" style="margin:.2rem 0 1rem 1rem;">
-                <li><?php esc_html_e('General','fa-fundraising'); ?>: <span id="b_gen">—</span></li>
-                <li><?php esc_html_e('Cause','fa-fundraising'); ?>: <span id="b_cause">—</span></li>
-                <li><?php esc_html_e('Sponsorship','fa-fundraising'); ?>: <span id="b_spon">—</span></li>
+          <div class="fa-kpis" style="margin-top:12px;">
+            <div class="fa-kpi"><div class="fa-muted"><?php esc_html_e('Lifetime Total','fa-fundraising'); ?></div><div id="k_lifetime" style="font-weight:700;font-size:1.1rem;">—</div></div>
+            <div class="fa-kpi"><div class="fa-muted"><?php esc_html_e('Month to Date','fa-fundraising'); ?></div><div id="k_mtd" style="font-weight:700;font-size:1.1rem;">—</div></div>
+            <div class="fa-kpi"><div class="fa-muted"><?php esc_html_e('Last Month','fa-fundraising'); ?></div><div id="k_lm" style="font-weight:700;font-size:1.1rem;">—</div></div>
+            <div class="fa-kpi"><div class="fa-muted"><?php esc_html_e('Active Sponsorships','fa-fundraising'); ?></div><div id="k_active" style="font-weight:700;font-size:1.1rem;">—</div></div>
+          </div>
+        </div>
+
+        <div class="fa-grid">
+          <div class="fa-card">
+            <h4 style="margin-top:0;"><?php esc_html_e('Donations — last 12 months','fa-fundraising'); ?></h4>
+            <canvas id="fa-line"></canvas>
+          </div>
+          <div class="fa-card">
+            <h4 style="margin-top:0;"><?php esc_html_e('Breakdown','fa-fundraising'); ?></h4>
+            <canvas id="fa-donut"></canvas>
+            <ul class="fa-muted" style="margin:.6rem 0 0 1rem">
+              <li><?php esc_html_e('General','fa-fundraising'); ?>: <span id="b_gen">—</span></li>
+              <li><?php esc_html_e('Cause','fa-fundraising'); ?>: <span id="b_cause">—</span></li>
+              <li><?php esc_html_e('Sponsorship','fa-fundraising'); ?>: <span id="b_spon">—</span></li>
             </ul>
+          </div>
+        </div>
 
-            <div id="fa-series" style="margin-top:1rem;">
-                <h4><?php esc_html_e('Donations (last 12 months)','fa-fundraising'); ?></h4>
-                <div id="fa-series-labels" style="font-size:.9rem;opacity:.8;"></div>
-                <div id="fa-series-data" style="font-family:monospace;"></div>
-            </div>
+        <div class="fa-grid">
+          <div class="fa-card" style="grid-column:1/-1;">
+            <h4 style="margin-top:0;"><?php esc_html_e('Recent Donations','fa-fundraising'); ?></h4>
+            <table class="fa-table">
+              <thead><tr>
+                <th><?php esc_html_e('Date','fa-fundraising'); ?></th>
+                <th><?php esc_html_e('Type','fa-fundraising'); ?></th>
+                <th><?php esc_html_e('Amount','fa-fundraising'); ?></th>
+                <th><?php esc_html_e('Status','fa-fundraising'); ?></th>
+                <th><?php esc_html_e('Receipt','fa-fundraising'); ?></th>
+              </tr></thead>
+              <tbody id="fa-recent-body"><tr><td colspan="5" class="fa-muted"><?php esc_html_e('Loading…','fa-fundraising'); ?></td></tr></tbody>
+            </table>
+          </div>
+        </div>
 
-            <div id="fa-subs" style="margin-top:1rem;">
-                <h4><?php esc_html_e('My Subscriptions','fa-fundraising'); ?></h4>
-                <table style="width:100%;border-collapse:collapse;">
-                    <thead>
-                        <tr>
-                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Subscription ID','fa-fundraising'); ?></th>
-                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Status','fa-fundraising'); ?></th>
-                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Current Period','fa-fundraising'); ?></th>
-                            <th style="border-bottom:1px solid #ddd;padding:8px;"><?php esc_html_e('Manage','fa-fundraising'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody id="fa-subs-body"></tbody>
-                </table>
-            </div>
+        <div id="fa-subs" class="fa-card" style="margin-top:14px;">
+            <h4 style="margin-top:0;"><?php esc_html_e('My Subscriptions','fa-fundraising'); ?></h4>
+            <table class="fa-table">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Subscription ID','fa-fundraising'); ?></th>
+                        <th><?php esc_html_e('Status','fa-fundraising'); ?></th>
+                        <th><?php esc_html_e('Current Period','fa-fundraising'); ?></th>
+                        <th><?php esc_html_e('Manage','fa-fundraising'); ?></th>
+                    </tr>
+                </thead>
+                <tbody id="fa-subs-body"><tr><td colspan="4" class="fa-muted"><?php esc_html_e('Loading…','fa-fundraising'); ?></td></tr></tbody>
+            </table>
         </div>
 
         <script>
         (function(){
             const api = (p)=> (window.wpApiSettings?.root || '/wp-json/') + 'faf/v1' + p;
-            const money = (v)=> new Intl.NumberFormat(undefined,{style:'currency',currency:'INR',maximumFractionDigits:0}).format(v||0);
+            const money = (v, cur='INR')=> new Intl.NumberFormat(undefined,{style:'currency',currency:cur,maximumFractionDigits:0}).format(v||0);
 
+            // ----- KPIs + donut -----
             async function loadSummary(){
                 const r = await fetch(api('/stats/summary'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
-                const j = await r.json();
-                if (!j.ok) return;
+                const j = await r.json(); if (!j.ok) return;
                 document.getElementById('k_lifetime').textContent = money(j.lifetime_total);
                 document.getElementById('k_mtd').textContent = money(j.month_to_date);
                 document.getElementById('k_lm').textContent = money(j.last_month);
                 document.getElementById('k_active').textContent = j.active_sponsorships;
 
                 const bd = j.breakdown || {};
+                const gen = bd.general?.amount || 0, cause = bd.cause?.amount || 0, spon = bd.sponsorship?.amount || 0;
                 const fmt = (o)=> (o && typeof o.amount !== 'undefined') ? money(o.amount) + ' ('+(o.count||0)+')' : '—';
                 document.getElementById('b_gen').textContent = fmt(bd.general);
                 document.getElementById('b_cause').textContent = fmt(bd.cause);
                 document.getElementById('b_spon').textContent = fmt(bd.sponsorship);
+
+                // Donut
+                if (window.Chart){
+                    new Chart(document.getElementById('fa-donut'), {
+                      type: 'doughnut',
+                      data: { labels: ['General','Cause','Sponsorship'], datasets:[{ data:[gen,cause,spon] }] },
+                      options: { plugins:{ legend:{ position:'bottom' }}, cutout:'60%' }
+                    });
+                }
             }
 
+            // ----- 12-month series -----
             async function loadSeries(){
                 const r = await fetch(api('/stats/series'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
-                const j = await r.json();
-                if (!j.ok) return;
-                document.getElementById('fa-series-labels').textContent = j.labels.join('  |  ');
-                document.getElementById('fa-series-data').textContent = j.data.map(v=>money(v)).join('  |  ');
+                const j = await r.json(); if (!j.ok) return;
+                if (window.Chart){
+                    new Chart(document.getElementById('fa-line'), {
+                        type:'line',
+                        data:{ labels:j.labels, datasets:[{ label:'INR', data:j.data, tension:.25, fill:false }]},
+                        options:{ plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true }}}
+                    });
+                }
             }
 
+            // ----- Recent donations (last 10 captured) -----
+            async function loadRecent(){
+                const r = await fetch(api('/donations?page=1&per_page=10&status=captured'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
+                const j = await r.json();
+                const body = document.getElementById('fa-recent-body');
+                body.innerHTML='';
+                if (!j.ok || !j.items?.length){
+                    body.innerHTML = '<tr><td colspan="5" class="fa-muted"><?php echo esc_js(__('No donations yet.','fa-fundraising')); ?></td></tr>';
+                    return;
+                }
+                j.items.forEach(it=>{
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                      <td>${new Date(it.created_at+'Z').toLocaleDateString()}</td>
+                      <td>${it.type}</td>
+                      <td>${money(it.amount, it.currency)}</td>
+                      <td>${it.status}</td>
+                      <td>${it.status==='captured' ? `
+                          <a href="${api('/receipt/'+it.id+'?type=basic')}" target="_blank"><?php echo esc_js(__('Basic','fa-fundraising')); ?></a>
+                          &nbsp;|&nbsp;
+                          <a href="${api('/receipt/'+it.id+'?type=80g')}" target="_blank"><?php echo esc_js(__('80G','fa-fundraising')); ?></a>
+                        ` : '—'}</td>`;
+                    body.appendChild(tr);
+                });
+            }
+
+            // ----- Subscriptions -----
             async function loadSubs(){
                 const r = await fetch(api('/subscriptions'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
                 const j = await r.json();
                 const body = document.getElementById('fa-subs-body');
                 body.innerHTML = '';
                 if (!j.ok || !j.items?.length){
-                    body.innerHTML = '<tr><td colspan="4" style="padding:10px;"><?php echo esc_js(__('No subscriptions found.','fa-fundraising')); ?></td></tr>';
+                    body.innerHTML = '<tr><td colspan="4" class="fa-muted"><?php echo esc_js(__('No subscriptions found.','fa-fundraising')); ?></td></tr>';
                     return;
                 }
                 j.items.forEach(s=>{
@@ -201,23 +287,47 @@ class DonorShortcodes {
                     const manage = s.manage_url ? `<a href="${s.manage_url}" target="_blank"><?php echo esc_js(__('Manage','fa-fundraising')); ?></a>` : '—';
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                      <td style="padding:8px;border-bottom:1px solid #eee;">${s.razorpay_subscription_id}</td>
-                      <td style="padding:8px;border-bottom:1px solid #eee;">${s.status}</td>
-                      <td style="padding:8px;border-bottom:1px solid #eee;">${period}</td>
-                      <td style="padding:8px;border-bottom:1px solid #eee;">${manage}</td>
-                    `;
+                      <td>${s.razorpay_subscription_id}</td>
+                      <td>${s.status}</td>
+                      <td>${period}</td>
+                      <td>${manage}</td>`;
                     body.appendChild(tr);
                 });
             }
 
-            loadSummary();
-            loadSeries();
-            loadSubs();
+            // ----- Export CSV (client-side) -----
+            async function exportCsv(){
+                const r = await fetch(api('/donations?page=1&per_page=2000&status=captured'), {headers:{'X-WP-Nonce':'<?php echo esc_js($nonce); ?>'}});
+                const j = await r.json(); if (!j.ok || !j.items) return;
+                const rows = [['Date','Type','Amount','Currency','Status','Payment ID','Receipt No']];
+                j.items.forEach(it=>{
+                    rows.push([it.created_at, it.type, it.amount, it.currency, it.status, it.razorpay_payment_id||'', (it.receipt_no||'')]);
+                });
+                const csv = rows.map(r=>r.map(v=>('"' + String(v).replace(/"/g,'""') + '"')).join(',')).join('
+');
+                const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'donations.csv'; a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            // ----- Logout -----
+            async function logout(){
+                try{ await fetch(api('/auth/logout'), {method:'POST'}); }catch(e){}
+                window.location.href = '<?php echo esc_url(get_permalink((int) get_option('fa_donor_login_page_id'))); ?>';
+            }
+
+            document.getElementById('fa-export')?.addEventListener('click', exportCsv);
+            document.getElementById('fa-logout')?.addEventListener('click', logout);
+
+            loadSummary(); loadSeries(); loadRecent(); loadSubs();
         })();
         </script>
         <?php
         return ob_get_clean();
     }
+
 
     public function receipts($atts = [], $content = ''): string
     {
