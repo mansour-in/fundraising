@@ -63,7 +63,7 @@ function(){
                 body: JSON.stringify({
                   order_id: resp.razorpay_order_id,
                   payment_id: resp.razorpay_payment_id,
-                  razorpay_signature: resp.razorpay_signature
+                  signature: resp.razorpay_signature
                 })
               })
                 .then(r=>r.json())
