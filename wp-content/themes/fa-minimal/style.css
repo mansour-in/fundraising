@@ -1,8 +1,8 @@
 /*
 Theme Name: FA Minimal
 Theme URI: https://futureachievers.ngo
-Author: Future Achievers
-Description: Ultra-light Elementor-friendly theme for FA Fundraising.
+Author: Mansour M
+Description: Ultra-light Elementor-friendly theme that auto-installs FA Fundraising and seeds core pages.
 Version: 1.0.0
 Text Domain: fa-minimal
 */
@@ -16,6 +16,3 @@ a:hover{text-decoration:underline}
 .nav{display:flex;gap:14px;flex-wrap:wrap}
 .site-footer{border-top:1px solid #e5e7eb;background:#fff;margin-top:24px}
 .main{min-height:50vh}
-.fa-hero{padding:32px 0}
-.btn{display:inline-block;padding:.6rem 1rem;border-radius:10px;border:1px solid #111;background:#111;color:#fff}
-.btn--ghost{background:#f8fafc;border-color:#e5e7eb;color:#111}
