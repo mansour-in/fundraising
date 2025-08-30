@@ -1,0 +1,9 @@
+{
+  "name": "givewp-razorpay",
+  "private": true,
+  "devDependencies": { "@wordpress/scripts": "^30.0.0" },
+  "scripts": {
+    "build": "wp-scripts build assets/js/razorpay-gateway.js --output-path=assets/build",
+    "start": "wp-scripts start assets/js/razorpay-gateway.js --output-path=assets/build"
+  }
+}
