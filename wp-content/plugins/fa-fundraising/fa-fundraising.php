@@ -1,15 +1,15 @@
 <?php
-/**
- * Plugin Name: Future Achievers Fundraising
- * Description: Standalone fundraising engine (Razorpay-ready) with donor dashboard and receipts.
- * Version: 0.1.0
- * Author: Future Achievers
- * Text Domain: fa-fundraising
- */
+/*
+Plugin Name: Future Achievers Fundraising
+Description: Donations, subscriptions, receipts (80G) for NGOs. Elementor-friendly.
+Version: 1.0.0
+Author: Mansour M
+Text Domain: fa-fundraising
+*/
 
 if (!defined('ABSPATH')) exit;
 
-define('FAF_VERSION', '0.1.0');
+define('FAF_VERSION', '1.0.0');
 define('FAF_FILE', __FILE__);
 define('FAF_PATH', plugin_dir_path(__FILE__));
 define('FAF_URL', plugin_dir_url(__FILE__));
