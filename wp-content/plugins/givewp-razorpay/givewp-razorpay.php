@@ -1,25 +1,49 @@
 <?php
-/*
-Plugin Name: GiveWP – Razorpay Gateway
-Description: Razorpay payment gateway for GiveWP (on-site checkout + webhooks).
-Version: 1.0.0
-Author: Mansour M
-*/
+/**
+ * Plugin Name: GiveWP Razorpay Gateway
+ * Description: Adds Razorpay as a payment option for GiveWP donations.
+ * Version: 1.0.0
+ * Author: Mansour M
+ * License: GPL-2.0-or-later
+ * Text Domain: givewp-razorpay
+ */
 
-if (!defined('ABSPATH')) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly.
+}
 
-define('FA_GIVERZP_DIR', plugin_dir_path(__FILE__));
-define('FA_GIVERZP_URL', plugin_dir_url(__FILE__));
+/**
+ * Register Razorpay gateway with GiveWP.
+ *
+ * @param array $gateways Existing gateways.
+ *
+ * @return array Modified gateways.
+ */
+function givewp_razorpay_register_gateway( $gateways ) {
+    $gateways['razorpay'] = [
+        'admin_label'    => __( 'Razorpay', 'givewp-razorpay' ),
+        'checkout_label' => __( 'Razorpay', 'givewp-razorpay' ),
+    ];
 
-require __DIR__.'/vendor/autoload.php';
+    return $gateways;
+}
+add_filter( 'give_payment_gateways', 'givewp_razorpay_register_gateway' );
 
-add_action('givewp_register_payment_gateway', function($registrar) {
-    require_once __DIR__.'/src/Gateway/RazorpayGateway.php';
-    $registrar->registerGateway(\FA\GiveRazorpay\Gateway\RazorpayGateway::class);
-});
+/**
+ * Process a Razorpay donation.
+ *
+ * This is a stub that immediately marks the donation as complete. It should be
+ * replaced with real Razorpay integration in future steps.
+ *
+ * @param array $purchase_data Donation data.
+ */
+function givewp_razorpay_process_donation( $purchase_data ) {
+    $payment_id = give_insert_payment( $purchase_data );
 
-add_action('rest_api_init', function(){
-    (new \FA\GiveRazorpay\Routes\CreateOrder())->register();
-    (new \FA\GiveRazorpay\Routes\VerifyPayment())->register();
-    (new \FA\GiveRazorpay\Routes\Webhook())->register();
-});
+    if ( $payment_id ) {
+        give_update_payment_status( $payment_id, 'publish' );
+    }
+
+    return;
+}
+add_action( 'give_gateway_razorpay', 'givewp_razorpay_process_donation' );
