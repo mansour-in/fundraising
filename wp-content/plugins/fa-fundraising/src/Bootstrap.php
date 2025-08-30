@@ -21,6 +21,7 @@ class Bootstrap {
         (new \FA\Fundraising\Api\DonationController())->init();
         (new \FA\Fundraising\Api\CheckoutController())->init();
         (new \FA\Fundraising\Api\DirectoryController())->init();
+        (new \FA\Fundraising\Api\SubscriptionController())->init();
         (new \FA\Fundraising\Admin\Settings())->init();
         (new \FA\Fundraising\Payments\WebhookController())->init();
         (new \FA\Fundraising\CPT\Taxonomies())->init();
@@ -31,6 +32,7 @@ class Bootstrap {
         (new \FA\Fundraising\Admin\Metaboxes\CauseMetaBox())->init();
 
         (new \FA\Fundraising\Widgets\Elementor\Plugin())->init();
+        (new \FA\Fundraising\Cron\Sync())->init();
 
         // Minimal REST namespace (we’ll add routes later)
         add_action('rest_api_init', function(){
