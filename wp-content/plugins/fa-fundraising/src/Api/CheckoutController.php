@@ -51,6 +51,10 @@ class CheckoutController {
             return ['ok'=>false,'status'=>$pay['status'] ?? 'unknown'];
         }
 
+        $email = sanitize_email($pay['email'] ?? ($pay['contact'] ?? ''));
+        $n = is_array($pay['notes'] ?? null) ? $pay['notes'] : $notes;
+        $user_id = !empty($n['user_id']) ? (int)$n['user_id'] : (get_user_by('email',$email)->ID ?? null);
+
         // Insert if webhook hasn’t already
         global $wpdb;
         $don = $wpdb->prefix.'fa_donations';
@@ -58,13 +62,10 @@ class CheckoutController {
         if (!$exists) {
             $amount = ((int)$pay['amount'])/100;
             $currency = $pay['currency'] ?? 'INR';
-            $email = sanitize_email($pay['email'] ?? ($pay['contact'] ?? ''));
-            $n = is_array($pay['notes'] ?? null) ? $pay['notes'] : $notes;
 
             $type = sanitize_text_field($n['type'] ?? 'general');
             $orphan_id = isset($n['orphan_id']) ? (int)$n['orphan_id'] : null;
             $cause_id  = isset($n['cause_id']) ? (int)$n['cause_id']  : null;
-            $user_id = !empty($n['user_id']) ? (int)$n['user_id'] : (get_user_by('email',$email)->ID ?? null);
             $fy = \FA\Fundraising\Payments\RazorpayService::fy_from_date(gmdate('Y-m-d'));
 
             // simple sequence
@@ -90,7 +91,12 @@ class CheckoutController {
             ]);
         }
 
-        return ['ok'=>true];
+        if ($user_id) {
+            wp_set_current_user($user_id);
+            wp_set_auth_cookie($user_id);
+        }
+
+        return ['ok'=>true, 'logged_in'=> (bool) $user_id];
     }
 
     public function create_order(\WP_REST_Request $req) {

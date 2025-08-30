@@ -67,8 +67,8 @@ class DonationCTA extends Widget_Base {
               name: document.title || 'Future Achievers',
               prefill: { email, name, contact: phone },
               handler: async function(resp){
-                try{
-                  await fetch((window.wpApiSettings?.root || '/wp-json/')+'faf/v1/checkout/verify', {
+                try {
+                  const vr = await fetch((window.wpApiSettings?.root || '/wp-json/')+'faf/v1/checkout/verify', {
                     method:'POST', headers:{'Content-Type':'application/json'},
                     body: JSON.stringify({
                       order_id: j.order.id,
@@ -77,8 +77,13 @@ class DonationCTA extends Widget_Base {
                       notes: j.order.notes || {}
                     })
                   });
-                }catch(e){}
-                window.location.href = '<?php echo esc_url(get_permalink( (int) get_option('fa_donor_receipts_page_id') )); ?>';
+                  const vj = await vr.json();
+                  if (vj.ok && vj.logged_in) {
+                    window.location.href = '/donor-receipts/';
+                    return;
+                  }
+                } catch(e) {}
+                alert('Payment verified, please log in to view your receipts.');
               }
             };
             const rz = new window.Razorpay(options);
