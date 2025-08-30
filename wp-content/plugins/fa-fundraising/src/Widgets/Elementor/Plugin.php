@@ -11,11 +11,15 @@ class Plugin {
             require_once __DIR__.'/OrphanGrid.php';
             require_once __DIR__.'/DonationCTA.php';
             require_once __DIR__.'/SubscriptionCTA.php';
+            require_once __DIR__.'/CauseProgress.php';
+            require_once __DIR__.'/RecentDonors.php';
             $widgets_manager->register(new DonorDashboard());
             $widgets_manager->register(new ReceiptsTable());
             $widgets_manager->register(new OrphanGrid());
             $widgets_manager->register(new DonationCTA());
             $widgets_manager->register(new SubscriptionCTA());
+            $widgets_manager->register(new CauseProgress());
+            $widgets_manager->register(new RecentDonors());
         });
     }
 }
