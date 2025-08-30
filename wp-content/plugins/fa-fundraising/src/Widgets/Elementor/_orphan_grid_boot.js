@@ -51,17 +51,34 @@ function(){
         const j = await r.json();
         if (!j.ok) { alert(j.message || 'Error'); return; }
 
-        const options = {
-          key: j.key_id,
-          order_id: j.order.id,
-          name: document.title || 'Future Achievers',
-          prefill: { email: email, name: name, contact: phone },
-          handler: function () {
-            if (window.fa_donor_receipts_url) {
-              window.location.href = window.fa_donor_receipts_url;
+          const options = {
+            key: j.key_id,
+            order_id: j.order.id,
+            name: document.title || 'Future Achievers',
+            prefill: { email: email, name: name, contact: phone },
+            handler: function (resp) {
+              fetch(root + '/checkout/verify', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                  order_id: resp.razorpay_order_id,
+                  payment_id: resp.razorpay_payment_id,
+                  razorpay_signature: resp.razorpay_signature
+                })
+              })
+                .then(r=>r.json())
+                .then(v=>{
+                  if (v.ok) {
+                    if (window.fa_donor_receipts_url) {
+                      window.location.href = window.fa_donor_receipts_url;
+                    }
+                  } else {
+                    alert(v.message || 'Payment verification failed');
+                  }
+                })
+                .catch(()=>alert('Payment verification failed'));
             }
-          }
-        };
+          };
         const rz = new window.Razorpay(options);
         rz.open();
       });
