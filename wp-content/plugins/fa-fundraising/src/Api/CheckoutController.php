@@ -13,7 +13,84 @@ class CheckoutController {
                 'callback'=>[$this,'create_order'],
                 'permission_callback'=>'__return_true'
             ]);
+
+            register_rest_route('faf/v1','/checkout/verify',[
+                'methods'=>'POST',
+                'callback'=>[$this,'verify'],
+                'permission_callback'=>'__return_true'
+            ]);
         });
+    }
+
+    public function verify(\WP_REST_Request $req) {
+        $p = $req->get_json_params() ?: [];
+        $order_id = sanitize_text_field($p['order_id'] ?? '');
+        $payment_id = sanitize_text_field($p['payment_id'] ?? '');
+        $signature  = sanitize_text_field($p['signature'] ?? '');
+        $notes      = is_array($p['notes'] ?? null) ? $p['notes'] : [];
+
+        if (!$order_id || !$payment_id || !$signature) {
+            return new \WP_Error('bad','order_id, payment_id, signature required',['status'=>400]);
+        }
+
+        // Verify signature
+        $api = new \Razorpay\Api\Api(get_option('fa_rzp_key_id',''), get_option('fa_rzp_key_secret',''));
+        try {
+            $api->utility->verifyPaymentSignature([
+                'razorpay_order_id'   => $order_id,
+                'razorpay_payment_id' => $payment_id,
+                'razorpay_signature'  => $signature,
+            ]);
+        } catch (\Throwable $e) {
+            return new \WP_Error('sig','Bad signature',['status'=>401]);
+        }
+
+        // Pull payment from Razorpay to get amount/status/notes
+        $pay = $api->payment->fetch($payment_id)->toArray();
+        if (($pay['status'] ?? '') !== 'captured') {
+            return ['ok'=>false,'status'=>$pay['status'] ?? 'unknown'];
+        }
+
+        // Insert if webhook hasn’t already
+        global $wpdb;
+        $don = $wpdb->prefix.'fa_donations';
+        $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM $don WHERE razorpay_payment_id=%s", $payment_id));
+        if (!$exists) {
+            $amount = ((int)$pay['amount'])/100;
+            $currency = $pay['currency'] ?? 'INR';
+            $email = sanitize_email($pay['email'] ?? ($pay['contact'] ?? ''));
+            $n = is_array($pay['notes'] ?? null) ? $pay['notes'] : $notes;
+
+            $type = sanitize_text_field($n['type'] ?? 'general');
+            $orphan_id = isset($n['orphan_id']) ? (int)$n['orphan_id'] : null;
+            $cause_id  = isset($n['cause_id']) ? (int)$n['cause_id']  : null;
+            $user_id = !empty($n['user_id']) ? (int)$n['user_id'] : (get_user_by('email',$email)->ID ?? null);
+            $fy = \FA\Fundraising\Payments\RazorpayService::fy_from_date(gmdate('Y-m-d'));
+
+            // simple sequence
+            $opt = 'fa_receipt_seq_'.$fy; $seq=(int)get_option($opt,0)+1; update_option($opt,$seq,false);
+            $receipt_no = sprintf('%s/%06d', $fy, $seq);
+
+            $wpdb->insert($don, [
+                'created_at'=> current_time('mysql', true),
+                'user_id'   => $user_id ?: null,
+                'donor_name'=> sanitize_text_field($n['donor_name'] ?? ''),
+                'donor_email'=> $email,
+                'amount'    => $amount,
+                'currency'  => $currency,
+                'type'      => $type,
+                'orphan_id' => $orphan_id ?: null,
+                'cause_id'  => $cause_id  ?: null,
+                'razorpay_payment_id'=> $payment_id,
+                'razorpay_order_id'  => $order_id,
+                'status'    => 'captured',
+                'financial_year'=> $fy,
+                'receipt_no'=> $receipt_no,
+                'meta'      => maybe_serialize(['notes'=>$n,'verified_return'=>true])
+            ]);
+        }
+
+        return ['ok'=>true];
     }
 
     public function create_order(\WP_REST_Request $req) {

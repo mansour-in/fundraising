@@ -66,7 +66,20 @@ class DonationCTA extends Widget_Base {
               order_id: j.order.id,
               name: document.title || 'Future Achievers',
               prefill: { email, name, contact: phone },
-              handler: function(resp){ window.location.href = '<?php echo esc_url(get_permalink( (int) get_option('fa_donor_receipts_page_id') )); ?>'; }
+              handler: async function(resp){
+                try{
+                  await fetch((window.wpApiSettings?.root || '/wp-json/')+'faf/v1/checkout/verify', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                      order_id: j.order.id,
+                      payment_id: resp.razorpay_payment_id,
+                      signature: resp.razorpay_signature,
+                      notes: j.order.notes || {}
+                    })
+                  });
+                }catch(e){}
+                window.location.href = '<?php echo esc_url(get_permalink( (int) get_option('fa_donor_receipts_page_id') )); ?>';
+              }
             };
             const rz = new window.Razorpay(options);
             rz.open();
