@@ -18,43 +18,55 @@ class SubscriptionController {
 
     public function create(\WP_REST_Request $req) {
         $p = $req->get_json_params() ?: [];
-        $amount   = isset($p['amount']) ? (float)$p['amount'] : 0.0;
+        $amount = (float)($p['amount'] ?? 0);  // in INR
         $currency = $p['currency'] ?? 'INR';
-        $email    = sanitize_email($p['email'] ?? '');
-        $name     = sanitize_text_field($p['name'] ?? '');
-        $phone    = preg_replace('/[^0-9+]/','', (string)($p['phone'] ?? ''));
-        $orphan_id= isset($p['orphan_id']) ? (int)$p['orphan_id'] : 0;
+        $email = sanitize_email($p['email'] ?? '');
+        $name  = sanitize_text_field($p['name'] ?? '');
+        $phone = preg_replace('/[^0-9+]/','', (string)($p['phone'] ?? ''));
+        $orphan_id = (int)($p['orphan_id'] ?? 0);
 
         if ($amount <= 0 || !$email || !$orphan_id) {
             return new \WP_Error('bad','amount, email, orphan_id required',['status'=>400]);
         }
 
-        // ensure donor user
         $user_id = self::get_or_create_donor_user($email, $name);
-
-        $rzp = new RazorpayService();
         $api = new \Razorpay\Api\Api(get_option('fa_rzp_key_id',''), get_option('fa_rzp_key_secret',''));
 
-        // Create a subscription directly (no pre-created plan) using "item"
+        // 1) Find or create a monthly plan for this amount
+        $key = 'fa_rzp_plan_monthly_' . $currency . '_' . (int)round($amount*100);
+        $plan_id = get_option($key, '');
+        try {
+            if ($plan_id) { $api->plan->fetch($plan_id); } // validates
+        } catch (\Throwable $e) { $plan_id = ''; }
+
+        if (!$plan_id) {
+            $plan = $api->plan->create([
+                'period'   => 'monthly',
+                'interval' => 1,
+                'item' => [
+                    'name'     => 'Monthly Sponsorship ₹'.(int)$amount,
+                    'amount'   => (int) round($amount*100),
+                    'currency' => $currency
+                ]
+            ]);
+            $plan_id = $plan['id'];
+            update_option($key, $plan_id, false);
+        }
+
+        // 2) Create subscription with that plan
         $sub = $api->subscription->create([
-            'plan_id' => null,
-            'total_count' => 0,           // continue until cancelled
+            'plan_id' => $plan_id,
+            'total_count' => 0, // until cancelled
             'customer_notify' => 1,
-            'billing_cycle' => 'month',   // monthly
-            'quantity' => 1,
             'notes' => [
-                'orphan_id'    => (string)$orphan_id,
-                'user_id'      => (string)$user_id,
-                'donor_email'  => $email,
-                'donor_name'   => $name
-            ],
-            'item' => [
-                'name' => 'Sponsorship - Orphan #'.$orphan_id,
-                'amount' => (int) round($amount * 100),
-                'currency' => $currency,
+                'orphan_id'   => (string)$orphan_id,
+                'user_id'     => (string)$user_id,
+                'donor_email' => $email,
+                'donor_name'  => $name
             ]
         ]);
 
+        $rzp = new RazorpayService();
         return ['ok'=>true, 'key_id'=>$rzp->keyId(), 'subscription'=>$sub->toArray()];
     }
 
